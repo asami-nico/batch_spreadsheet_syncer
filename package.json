@@ -1,0 +1,22 @@
+{
+  "name": "s3_data_loader",
+  "version": "0.1.0",
+  "description": "load from s3, and upload database",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://XXXX"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.811.0",
+    "date-utils": "^1.2.21",
+    "events": "^3.2.0",
+    "pg": "^8.5.1",
+    "pg-copy-streams": "^5.1.1"
+  }
+}

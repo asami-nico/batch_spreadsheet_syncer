@@ -1,0 +1,103 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description:  upload data from s3 csv
+
+Parameters:
+  HandlerZipBucket:
+    Type: String
+  HandlerZipKey:
+    Type: String
+  DbHost:
+    Type: String
+  DbPort:
+    Type: String
+  DbUser:
+    Type: String
+  DbPass:
+    Type: String
+    NoEcho: true
+  DbBase:
+    Type: String
+  CsvBucket:
+    Type: String
+  SecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Default: "sg-00a5190c289f39117"
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: "subnet-4a15b202,subnet-db948580,subnet-c213bde9"
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-f1cc2997
+  RouteTableId:
+    Type: String
+    Default: rtb-3ea9db58
+
+Resources:
+  S3LoaderLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}
+      CodeUri: 
+        Bucket: !Ref HandlerZipBucket
+        Key: !Ref HandlerZipKey
+      Handler: src/index.handler
+      MemorySize: 256
+      Runtime: nodejs12.x
+      Timeout: 120
+      Role: !GetAtt S3LoaderLambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: !Ref "AWS::Region"
+          PGHOST: !Ref DbHost
+          PGPORT: !Ref DbPort
+          PGUSER: !Ref DbUser
+          PGPASS: !Ref DbPass
+          PGDB: !Ref DbBase
+      VpcConfig:
+        SecurityGroupIds: !Ref SecurityGroupIds
+        SubnetIds: !Ref SubnetIds
+
+  S3LoaderLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+
+  S3TriggerLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt S3LoaderLambdaFunction.Arn
+      Principal: "s3.amazonaws.com"
+      SourceArn: !Sub "arn:aws:s3:::${CsvBucket}" 
+
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: S3TriggerLambdaPermission
+    Properties:
+      BucketName: !Sub ${CsvBucket}
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:Put
+            Function: !GetAtt S3LoaderLambdaFunction.Arn
+
+  VPCS3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref VpcId
+      RouteTableIds: 
+        - !Ref RouteTableId
