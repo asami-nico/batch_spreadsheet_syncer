@@ -1,0 +1,2 @@
+# batch_spreadsheet_syncer
+Googleスプレッドシート-AWSの同期バッチ
